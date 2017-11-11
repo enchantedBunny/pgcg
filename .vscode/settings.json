@@ -1,0 +1,21 @@
+{
+    "files.associations": {
+        "*.thor": "ruby",
+        "*.jsx": "javascript",
+        "*.pyx": "python",
+        "string": "cpp",
+        "core": "cpp",
+        "ratio": "cpp",
+        "type_traits": "cpp",
+        "cmath": "cpp",
+        "cstddef": "cpp",
+        "cstdlib": "cpp",
+        "cstring": "cpp",
+        "cwchar": "cpp",
+        "chrono": "cpp",
+        "cstdint": "cpp",
+        "ctime": "cpp",
+        "iosfwd": "cpp",
+        "limits": "cpp"
+    }
+}
