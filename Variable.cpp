@@ -40,11 +40,7 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 			deps_count = a->deps_count;
 			deps_list = a->deps_list;
 		}
-			else{			
-			int *l_ordered;
-			int l_l ;	
-			int *r_ordered;
-			int r_l ;	
+			else{	
 			if (a->type == function){
 				l_ordered = a->deps_list;
 				l_l = a->deps_count;
@@ -149,33 +145,76 @@ float square(float x) // the functor we want to apply
 {
     return x*x;
 }
-Eigen::MatrixXd Variable::getValue(const Eigen::MatrixXd &in){
-	if (type == independent) return in;
-	if (type == constant) return val;
+//Eigen::MatrixXd Variable::getValue(const Eigen::MatrixXd &in){
+void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
+	cPrint("alive");
+	if (id == targetID){
+		val = in.replicate(1,1); //should be a pointer in the future
+		rows = val.rows();
+		columns = val.cols();
+	}
+	else if(type==function){
+		if (left->id == targetID)
+			left->setValue(targetID, in);
+		else if (right->id == targetID)
+			right->setValue(targetID, in);
+		else{
+			cPrint("finding where");
+			for (int i = 0; i<l_l; i++){
+				if (l_ordered[i] == targetID){
+					cPrint("done, it's left");
+					left->setValue(targetID, in);
+					return;
+				}
+			}
+			for (int i = 0; i<r_l; i++){
+				if (r_ordered[i] == targetID){
+					cPrint("done, it's right");
+					right->setValue(targetID, in);
+					return;
+				}
+			}
+		}
+	}
 	
-	Eigen::MatrixXd l = left->getValue(in);
+}
+
+Eigen::MatrixXd Variable::getValue(){
+	cPrint("here");
+	
+	if (type == independent) return val;
+	if (type == constant) return val;
+
+	
+	Eigen::MatrixXd l = left->getValue();
+	cPrintM(l);
+	
 	if (op == "sigmoid_r") return l.unaryExpr(&sigmoid_r);
 	if (op == "sigmoid") return l.unaryExpr(&sigmoid);
 	if (op == "square") return l.unaryExpr(&square);
 	if (op == "rowsum") return l.rowwise().sum();
 
-	 //only one input -> 'update' constants
-	Eigen::MatrixXd r = right->getValue(in);
+	 //getvalue has no inputs -> 'update' variables before using
+	Eigen::MatrixXd r = right->getValue();
+	cPrintM(r);
 
-	Eigen::MatrixXd m(1,deps_count);
-	for (int i = 0; i<deps_count; i++)
-		m(0,i) = deps_list[i];
+	Eigen::MatrixXd rr(1,1);
+	rr(0,0) = 5;
+	return rr;
+	// Eigen::MatrixXd m(1,deps_count);
+	// for (int i = 0; i<deps_count; i++)
+	// 	m(0,i) = deps_list[i];
 	
 	
-	if (op == "colwise"){
-		for (int i = 0; i<l.cols(); i++){
-			for (int ii = 0; ii<l.rows(); ii++){
-				l(ii,i) *= r(ii,0);
+	// if (op == "colwise"){
+	// 	for (int i = 0; i<l.cols(); i++){
+	// 		for (int ii = 0; ii<l.rows(); ii++){
+	// 			l(ii,i) *= r(ii,0);
 
-			}
-		}
-		return l;
-	}
+	// 		}
+	// 	}
+	// 	return l;
+	// }
 	if (op == "+")return (l + r).transpose();
 	if (op == "-")return (l - r).transpose();
 	if (op == "*")return (l.transpose() * r).transpose(); //figure out which kind of multiplication (matrix vs scalar)
