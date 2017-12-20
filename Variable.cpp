@@ -3,11 +3,11 @@
 #include "variable.h"
 using namespace calc;
 
-
+//sets ID
 void Variable::setID(int bId){
 	id = bId;
 }
-
+//init for constants
 Variable::Variable(const Eigen::MatrixXd &mat){
 	type = constant;
 	deps_count = 0;
@@ -18,14 +18,14 @@ Variable::Variable(const Eigen::MatrixXd &mat){
 }
 void Variable::show(){
 }
-
+//init for independent
 Variable::Variable(int &r, int &c){
 	type = independent;
 	deps_count = 1;
 	rows = r;
 	columns = c;
 }
-
+// init for fns with 2 inputs
 Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 	type = function;
 	left = a;
@@ -122,7 +122,7 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 		
 	}
 }
-
+//init for fns with a single input
 Variable::Variable(Variable *a, std::string *o, bool getDerivs){
 	type = function;
 	left = a;
@@ -130,9 +130,11 @@ Variable::Variable(Variable *a, std::string *o, bool getDerivs){
 	deps_count = a->deps_count;
 	deps_list = a->deps_list;
 }
+//init for fns with a single input and a number - eg pow
 Variable::Variable(Variable *a, std::string *op, int p, bool getDerivs){
 	type = function;
 }
+
 float sigmoid_r(float x) // the functor we want to apply
 {
     return (1/(1+std::exp(-x))) * (1- (1/(1+std::exp(-x))));
@@ -145,7 +147,7 @@ float square(float x) // the functor we want to apply
 {
     return x*x;
 }
-//Eigen::MatrixXd Variable::getValue(const Eigen::MatrixXd &in){
+//setter function fills the tree, used before getValue()
 void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
 	cPrint("alive");
 	if (id == targetID){
@@ -178,7 +180,7 @@ void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
 	}
 	
 }
-
+// getter function which finds and spits out value- will merge this with the setter so that value is always calculated as the numbers are filled in
 Eigen::MatrixXd Variable::getValue(){
 	cPrint("here");
 	
