@@ -12,9 +12,9 @@ cdef extern from "Variable.h" namespace "calc":
         Variable(Variable *a, string *op, string *blop);
         void setID(int bId);
         MatrixXd getValue();
-        void setValue(int, Map[MatrixXd]);
+        void setValue(int, Map[MatrixXd] &);
 cdef public void cPrint(string s):
-    print(s.decode('utf8'))
+    print "         ",s.decode('utf8')
     return
 cdef public void cPrintM(MatrixXd i):
     print ndarray(i)
@@ -63,10 +63,9 @@ cdef class var:
         self.ID = b
     def getID(self):
         return self.ID
-    def value(self, dIn):
-        print (self.ID)
-        for key in dIn:
-            print(key.getID(),dIn[key])
-            self.thisptr.setValue(key.getID(), Map[MatrixXd](dIn[key]))
-        #return "jim"
-        return ndarray(self.thisptr.getValue())
+    def value(self, dIn=None, egg = True):
+        if dIn != None:
+            for key in dIn:
+                self.thisptr.setValue(key.getID(), Map[MatrixXd](dIn[key]))
+        if egg:
+            return ndarray(self.thisptr.getValue())

@@ -11,12 +11,14 @@ void Variable::setID(int bId){
 Variable::Variable(const Eigen::MatrixXd &mat){
 	type = constant;
 	deps_count = 0;
-	val = mat.replicate(1,1);
+	val = mat.transpose();
 	rows = val.rows();
 	columns = val.cols();
-	show();
+	
+	
 }
 void Variable::show(){
+	cPrintM(val);
 }
 //init for independent
 Variable::Variable(int &r, int &c){
@@ -35,12 +37,18 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 		if (a->type == constant){
 			deps_count = b->deps_count;
 			deps_list = b->deps_list;
+			l_l = 0;
+			r_l = deps_count;
+			r_ordered =b->deps_list;
 		}
 		else if (b->type == constant){
 			deps_count = a->deps_count;
 			deps_list = a->deps_list;
+			r_l = 0;
+			l_l = deps_count;
+			l_ordered = deps_list;
 		}
-			else{	
+		else{	
 			if (a->type == function){
 				l_ordered = a->deps_list;
 				l_l = a->deps_count;
@@ -80,7 +88,7 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 						deps_list[i] = l_ordered[li];
 						li++;
 					}
-					else if (r_ordered[ri]<l_ordered[li]){
+					else{
 						deps_list[i] = r_ordered[ri];
 						ri++;
 						li++;
@@ -102,22 +110,49 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 			deps_count = 1;
 			deps_list = new int[1];
 			deps_list[0] = a->id;
+			if (a->type == independent){
+				l_l = 1;
+				r_l = 1;
+				l_ordered = new int[1];
+				l_ordered[0] = {b->id};
+				r_ordered = new int[1];
+				r_ordered[0] = {b->id};
+			}
+			else{
+				l_l = 0;
+				r_l = 0;
+			}
+
 		}
 		else if ( a->type == independent and b->type == independent){
 			deps_count = 2;
 			deps_list = new int[2];
 			deps_list[0] = std::min(a->id, b->id);
 			deps_list[1] = std::max(a->id, b->id);
+			l_l = 1;
+			r_l = 1;
+			l_ordered = new int[1];
+			l_ordered[0] = {a->id};
+			r_ordered = new int[1];
+			r_ordered[0] = {b->id};
 		}
 		else if (a->type == independent and b->type == constant){
 			deps_count = 1;
 			deps_list = new int[1];
 			deps_list[0] = a->id;
+			l_l = 1;
+			r_l = 0;
+			l_ordered = new int[1];
+			l_ordered[0] = {a->id};
 		}
 		else if (a->type == constant and b->type == independent){
 			deps_count = 1;
 			deps_list = new int[1];
 			deps_list[0] = b->id;
+			l_l = 0;
+			r_l = 1;
+			r_ordered = new int[1];
+			r_ordered[0] = {b->id};
 		}
 		
 	}
@@ -129,6 +164,9 @@ Variable::Variable(Variable *a, std::string *o, bool getDerivs){
 	op = *o;
 	deps_count = a->deps_count;
 	deps_list = a->deps_list;
+	l_l = deps_count;
+	l_ordered = deps_list;
+	r_l = 0;
 }
 //init for fns with a single input and a number - eg pow
 Variable::Variable(Variable *a, std::string *op, int p, bool getDerivs){
@@ -137,7 +175,7 @@ Variable::Variable(Variable *a, std::string *op, int p, bool getDerivs){
 
 float sigmoid_r(float x) // the functor we want to apply
 {
-    return (1/(1+std::exp(-x))) * (1- (1/(1+std::exp(-x))));
+    return (x* (1- x));
 }
 float sigmoid(float x) // the functor we want to apply
 {
@@ -149,31 +187,28 @@ float square(float x) // the functor we want to apply
 }
 //setter function fills the tree, used before getValue()
 void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
-	cPrint("alive");
 	if (id == targetID){
-		val = in.replicate(1,1); //should be a pointer in the future
+		val = in.transpose();
 		rows = val.rows();
 		columns = val.cols();
 	}
 	else if(type==function){
-		if (left->id == targetID)
+		if (left->id == targetID){
+			left->setValue(targetID, in);}
+		else if (l_l == deps_count){
 			left->setValue(targetID, in);
-		else if (right->id == targetID)
-			right->setValue(targetID, in);
+		}
+		else if (right->id == targetID){
+			right->setValue(targetID, in);}
 		else{
-			cPrint("finding where");
 			for (int i = 0; i<l_l; i++){
 				if (l_ordered[i] == targetID){
-					cPrint("done, it's left");
 					left->setValue(targetID, in);
-					return;
 				}
 			}
 			for (int i = 0; i<r_l; i++){
 				if (r_ordered[i] == targetID){
-					cPrint("done, it's right");
 					right->setValue(targetID, in);
-					return;
 				}
 			}
 		}
@@ -182,43 +217,43 @@ void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
 }
 // getter function which finds and spits out value- will merge this with the setter so that value is always calculated as the numbers are filled in
 Eigen::MatrixXd Variable::getValue(){
-	cPrint("here");
+	
 	
 	if (type == independent) return val;
 	if (type == constant) return val;
 
 	
 	Eigen::MatrixXd l = left->getValue();
-	cPrintM(l);
-	
+
 	if (op == "sigmoid_r") return l.unaryExpr(&sigmoid_r);
 	if (op == "sigmoid") return l.unaryExpr(&sigmoid);
 	if (op == "square") return l.unaryExpr(&square);
 	if (op == "rowsum") return l.rowwise().sum();
+	if (op == "transpose") return l.transpose();
+	
+	// cPrint("l");
+	// cPrintM(l);
 
+	if (right == nullptr)return l;
 	 //getvalue has no inputs -> 'update' variables before using
 	Eigen::MatrixXd r = right->getValue();
-	cPrintM(r);
 
-	Eigen::MatrixXd rr(1,1);
-	rr(0,0) = 5;
-	return rr;
-	// Eigen::MatrixXd m(1,deps_count);
-	// for (int i = 0; i<deps_count; i++)
-	// 	m(0,i) = deps_list[i];
 	
+	// cPrint("r");
+	// cPrintM(r);
 	
-	// if (op == "colwise"){
-	// 	for (int i = 0; i<l.cols(); i++){
-	// 		for (int ii = 0; ii<l.rows(); ii++){
-	// 			l(ii,i) *= r(ii,0);
+	if (op == "rowwise") {
+		if (r.cols()==1){
+			r = r.transpose();
+		}
+		Eigen::VectorXd v(r.cols());
+		for (int i = 0; i< r.cols(); i++)
+			v(i)=r(0,i);
+		l.array().rowwise() *= v.array().transpose();
+		return l;}
 
-	// 		}
-	// 	}
-	// 	return l;
-	// }
-	if (op == "+")return (l + r).transpose();
-	if (op == "-")return (l - r).transpose();
-	if (op == "*")return (l.transpose() * r).transpose(); //figure out which kind of multiplication (matrix vs scalar)
-	if (op == "/")return (l / r(0,0)).transpose();
+	if (op == "+")return (l + r);
+	if (op == "-")return (l - r);
+	if (op == "*")return (l * r); //figure out which kind of multiplication (matrix vs scalar)
+	if (op == "/")return (l / r(0,0));
 }
