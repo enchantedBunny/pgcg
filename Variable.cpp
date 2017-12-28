@@ -251,6 +251,16 @@ Eigen::MatrixXd Variable::getValue(){
 			v(i)=r(0,i);
 		l.array().rowwise() *= v.array().transpose();
 		return l;}
+	if (op == "rowwise-") {
+		if (r.cols()==1){
+			r = r.transpose();
+		}
+		Eigen::VectorXd v(r.cols());
+		for (int i = 0; i< r.cols(); i++)
+			v(i)=r(0,i);
+		l.array().rowwise() -= v.array().transpose();
+		return l;}
+
 
 	if (op == "+")return (l + r);
 	if (op == "-")return (l - r);

@@ -21,10 +21,17 @@ cdef public void cPrintM(MatrixXd i):
     return
 
 cdef int b = 0
-#
-#Learn how to pass string bitch
-#
-#
+def function(a, b, inop=None):
+    g = var("function")
+    if type(a) == var and type(b) ==var and inop!=None:
+        g.f(a, b, inop)
+        return g
+    elif type(a) == var and type(b)==str and inop == None:
+        g.sf(a, b)
+        return g
+    #add a thing for pow and such 
+    print("I don't get it")
+    
 cdef class var:
     cdef:
         Variable *thisptr
@@ -69,3 +76,7 @@ cdef class var:
                 self.thisptr.setValue(key.getID(), Map[MatrixXd](dIn[key]))
         if egg:
             return ndarray(self.thisptr.getValue())
+    def T(self):
+        g = var("function")
+        g.sf(self, "transpose")
+        return g
