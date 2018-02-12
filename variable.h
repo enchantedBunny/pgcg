@@ -19,6 +19,7 @@
 #endif
 
 __PYX_EXTERN_C DL_IMPORT(void) cPrint(std::string);
+__PYX_EXTERN_C DL_IMPORT(void) cError(std::string);
 __PYX_EXTERN_C DL_IMPORT(void) cPrintM(Eigen::MatrixXd);
 
 #endif /* !__PYX_HAVE_API__pyCalc */
