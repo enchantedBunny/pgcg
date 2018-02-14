@@ -1,7 +1,32 @@
 #include "Variable.h"
 #include <Python.h>
 #include "variable.h"
+#include "Helpers.h"
+#include "helpers.h"
 using namespace calc;
+//this shouldn't be necessary, figure it out!!!
+//square? - duh -
+long double sq(long double x)
+{
+    return x*x;
+}
+//1/(1+e^-x)
+long double sigmoid(long double x)
+{
+    return (1/(1+std::exp(-x)));
+}
+//derivative of the sigmoid in terms of y
+long double sigmoid_ry(long double y)
+{
+    return (y* (1- y));
+}
+//derivative of the sigmoid in terms of x
+long double sigmoid_rx(long double x)
+{
+    x = sigmoid(x);
+    return (x* (1- x));
+}
+
 
 //sets ID
 void Variable::setID(int bId){
@@ -14,9 +39,6 @@ Variable::Variable(const Eigen::MatrixXd &mat){
 	val = mat.transpose();
 	rows = val.rows();
 	columns = val.cols();
-}
-void Variable::show(){
-	cPrint("My ID is " + std::to_string(id) + " and myoutput will be " + std::to_string(rows) + " x " + std::to_string(columns));
 }
 //init for independent
 Variable::Variable(int &r, int &c){
@@ -172,12 +194,15 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 		rows = left->rows;
 		columns = left->columns;
 	}
+	else if (op == "rowwise*" && left->columns == right->columns && left->rows == right->rows){
+		cPrint("valid");
+		rows = left->rows;
+		columns = left->columns;
+	}
 	else{
 		err = 2;
 		// error value 2  => operation invalid
-		cError("invalid operation");
-		cError("left is a " + std::to_string(left->rows) +"x" + std::to_string(left->columns) + " matrix");
-		cError("but right is a " + std::to_string(right->columns) +"x" + std::to_string(right->columns) + " matrix");
+		cError("<invalid operation: " + op + " >left is a " + std::to_string(left->rows) +"x" + std::to_string(left->columns) + " matrix but right is a " + std::to_string(right->rows) +"x" + std::to_string(right->columns) + " matrix");
 
 	}
 	
@@ -207,28 +232,23 @@ Variable::Variable(Variable *a, std::string *o, bool getDerivs){
 
 	cPrint("output will be " + std::to_string(rows) + " x " + std::to_string(columns));
 }
+//debug fn that shows info about variable
+void Variable::show(){
+	cPrint("My ID is " + std::to_string(id) + " and myoutput will be " + std::to_string(rows) + " x " + std::to_string(columns));
+}
+//setter for additional opperand some functions use (e.g. pow)
 void Variable::setOpperand(int p){
 	opperand = p;
 };
-long double sigmoid_r(long double x) // the functor we want to apply
-{
-    return (x* (1- x));
-}
-long double sigmoid(long double x) // the functor we want to apply
-{
-    return (1/(1+std::exp(-x)));
-}
-float square(float x) // the functor we want to apply
-{
-    return x*x;
-}
 //setter function fills the tree, used before getValue()
 void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
 	if (id == targetID){
-		if (rows == in.rows() && columns == in.cols())
+		if (rows == in.rows() && columns == in.cols()){
 			val = in;
-		else if(columns == in.rows() && rows == in.cols())
+		}
+		else if(columns == in.rows() && rows == in.cols()){
 			val = in.transpose();
+		}
 		else {
 			val = in;
 			err = 1;
@@ -237,7 +257,6 @@ void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
 			cError("expected a " + std::to_string(rows) +"x" + std::to_string(columns) + " matrix");
 			cError("but received a " + std::to_string(in.rows()) +"x" + std::to_string(in.cols()) + " matrix");
 		}
-
 	}
 	else if(type==function){
 		if (left->id == targetID){
@@ -262,19 +281,46 @@ void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
 	}
 	
 }
+// setter fn for iteration ID - REDUNDANT -> IT'S DONE BY getValue, adding this was a stupid mistake
+void Variable::setItID(int it){
+	itid = it;
+	if (l_l > 0){
+		left->setItID(it);
+	}
+	if (r_l > 0){
+		right->setItID(it);
+	} 
+}
 // getter function which finds and spits out value- will merge this with the setter so that value is always calculated as the numbers are filled in
-Eigen::MatrixXd Variable::getValue(){
-	
-	
+Eigen::MatrixXd Variable::getValue(int it){
+
 	if (type == independent) return val;
 	if (type == constant) return val;
-
 	
-	Eigen::MatrixXd l = left->getValue();
+
+	if (itid == it){ //this fn for this var has already been executed, ergo we can use lastValue
+		return lastVal;
+	}itid = it;
+	
+	
+	Eigen::MatrixXd l = left->getValue(it);
 	if (ftype == one){
-		if (op == "sigmoid_r") lastVal = l.unaryExpr(&sigmoid_r);
+		if (op == "sigmoid_r") lastVal = l.unaryExpr(&sigmoid_ry);
 		if (op == "sigmoid") lastVal =  l.unaryExpr(&sigmoid);
-		if (op == "unary_square") lastVal =  l.unaryExpr(&square);
+		if (op == "softmax") {
+			if (l.rows()==1){
+				l = l.transpose();
+			}
+			float s = 0;
+			for (int i =0; i<l.rows(); i++){
+				s += std::exp(l(i,0));
+			}
+			for (int i =0; i<l.rows(); i++){
+				l(i,0) = std::exp(l(i,0))/s;
+			}
+			lastVal =  l;
+		}
+		//if (op == "unary_square") lastVal =  l.unaryExpr(&sq);
 		if (op == "unary_pow") lastVal =  l.array().pow(opperand);
 
 		if (op == "rowsum") lastVal =  l.rowwise().sum();
@@ -287,13 +333,8 @@ Eigen::MatrixXd Variable::getValue(){
 		}
 		return lastVal;
 	}
-	
-	// cPrint("l");
-	// cPrintM(l);
-
 	if (right == nullptr)return l;
-	 //getvalue has no inputs -> 'update' variables before using
-	Eigen::MatrixXd r = right->getValue();
+	Eigen::MatrixXd r = right->getValue(it);
 
 	
 	// cPrint("r");
@@ -309,7 +350,79 @@ Eigen::MatrixXd Variable::getValue(){
 	// 	l.array().rowwise() *= v.array().transpose();
 	// 	return l;}
 	if (ftype != one){
+		if (op == "colwise*") { //I think this is colwise* .. oh well
+			if (r.rows()==1){
+				r = r.transpose();
+			}
+			if (l.rows()==1){
+				l = l.transpose();
+			}
+			if (l.rows() != r.rows()){
+				cError("cannot do rowwsie*, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
+				return r;
+			}
+			else if (l.cols()!=1 && r.cols()!=1){
+				cError("cannot do rowwsie*, neither is a column vector");
+				return r;
+			}
+			bool right = false;
+			int cols = r.cols();
+			int rows = l.rows();
+			if (cols==1){
+				right = true;
+				cols = l.cols();
+			}
+			for (int g = 0; g<rows; g++){
+				for (int i = 0; i< cols; i++)
+				{
+					if (right)
+						l(g,i) *= r(g,0);
+					else
+						r(g,i) *= l(g,0);
+				}
+			}
+			if (right)	
+				lastVal = l;
+			else
+				lastVal = r;
+		}
 		if (op == "rowwise*") {
+			if (r.cols()==1){
+				r = r.transpose();
+			}
+			if (l.cols()==1){
+				l = l.transpose();
+			}
+			if (l.cols() != r.cols()){
+				cError("cannot do rowwsie*, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
+				return r;
+			}
+			else if (l.rows()!=1 && r.rows()!=1){
+				cError("cannot do rowwsie*, neither is a row vector");
+				return r;
+			}
+			bool right = false; //right is not a row vector
+			int cols = l.cols();
+			int rows = r.rows();
+			if (rows==1){
+				right = true;
+				rows = l.rows();
+			}
+			for (int g = 0; g<rows; g++){
+				for (int i = 0; i< cols; i++)
+				{
+					if (right)
+						l(g,i) *= r(0,i);
+					else
+						r(g,i) *= l(0,i);
+				}
+			}
+			if (right)	
+				lastVal = l;
+			else
+				lastVal = r;
+		}
+		if (op == "rowwise*OLD") {
 			if (r.cols()==1){
 				r = r.transpose();
 			}
@@ -336,21 +449,23 @@ Eigen::MatrixXd Variable::getValue(){
 			l.array().rowwise() -= v.array().transpose();
 			lastVal = l;}
 
-
-		if (op == "+")lastVal = (l + r);
-		if (op == "-")lastVal = (l - r);
-		if (op == "*")lastVal = (l * r); //figure out which kind of multiplication (matrix vs scalar)
-		if (op == "/")lastVal = (l / r(0,0));
-
+		if (op == "+")lastVal = l + r;
+		if (op == "-")lastVal = l - r;
+		if (op == "*") lastVal = l * r; //figure out which kind of multiplication (matrix vs scalar)
+		if (op == "/")lastVal = l / r(0,0);
 		return lastVal;
 	}
 }
+// getter that doesn't compute the value again
 Eigen::MatrixXd Variable::getLastValue(){
 	return lastVal;
 }
+// getter that prints returns current error code
 int Variable::getErr(){
 	return err;
 };
+// setter that resets err
 void Variable::resetErr(){
 	err = -199;
 };
+
