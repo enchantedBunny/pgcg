@@ -10,6 +10,11 @@ long double sq(long double x)
 {
     return x*x;
 }
+//ln
+long double ln(long double x)
+{
+    return std::log(x);
+}
 //1/(1+e^-x)
 long double sigmoid(long double x)
 {
@@ -307,16 +312,35 @@ Eigen::MatrixXd Variable::getValue(int it){
 	if (ftype == one){
 		if (op == "sigmoid_r") lastVal = l.unaryExpr(&sigmoid_ry);
 		if (op == "sigmoid") lastVal =  l.unaryExpr(&sigmoid);
+		if (op == "ln") lastVal =  l.unaryExpr(&ln);
 		if (op == "softmax") {
 			if (l.rows()==1){
 				l = l.transpose();
 			}
-			float s = 0;
-			for (int i =0; i<l.rows(); i++){
-				s += std::exp(l(i,0));
+			for (int j =0; j<l.rows(); j++){
+				float s = 0;
+				for (int i =0; i<l.cols(); i++){
+					s += std::exp(l(j,i));
+				}
+				for (int i =0; i<l.cols(); i++){
+					l(j,i) = std::exp(l(j,i))/s;
+				}
 			}
-			for (int i =0; i<l.rows(); i++){
-				l(i,0) = std::exp(l(i,0))/s;
+			lastVal =  l;
+		}
+		if (op == "softmax_r") {
+			if (l.rows()==1){
+				l = l.transpose();
+			}
+			for (int j =0; j<l.rows(); j++){
+				float s = 0;
+				for (int i =0; i<l.cols(); i++){
+					s += std::exp(l(j,i));
+				}
+				for (int i =0; i<l.cols(); i++){
+					int a  = std::exp(l(j,i));
+					l(j,i) = ( a * (s - a)   ) /  (s*s);
+				}
 			}
 			lastVal =  l;
 		}
@@ -358,7 +382,7 @@ Eigen::MatrixXd Variable::getValue(int it){
 				l = l.transpose();
 			}
 			if (l.rows() != r.rows()){
-				cError("cannot do rowwsie*, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
+				cError("cannot do colwsie*, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
 				return r;
 			}
 			else if (l.cols()!=1 && r.cols()!=1){
@@ -385,6 +409,42 @@ Eigen::MatrixXd Variable::getValue(int it){
 				lastVal = l;
 			else
 				lastVal = r;
+		}
+		if (op == "elementwise*") {
+			if (l.cols() != r.cols()){
+				cError("cannot do elementwise*, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
+				return r;
+			}
+			if (l.rows() != r.rows()){
+				cError("cannot do elementwise*, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
+				return r;
+			}
+			for (int g = 0; g<l.rows(); g++){
+				for (int i = 0; i< l.cols(); i++)
+				{
+					l(g,i) *= r(g,i);
+				}
+			}
+			lastVal = l;
+			
+		}
+		if (op == "elementwise/") {
+			if (l.cols() != r.cols()){
+				cError("cannot do elementwise/, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
+				return r;
+			}
+			if (l.rows() != r.rows()){
+				cError("cannot do elementwise/, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
+				return r;
+			}
+			for (int g = 0; g<l.rows(); g++){
+				for (int i = 0; i< l.cols(); i++)
+				{
+					l(g,i) /= r(g,i);
+				}
+			}
+			lastVal = l;
+			
 		}
 		if (op == "rowwise*") {
 			if (r.cols()==1){
