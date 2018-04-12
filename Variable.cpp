@@ -63,14 +63,14 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 	columns = right->columns;
 	op = *o;
 	if (a->type == function or b->type==function){
-		if (a->type == constant){
+		if (a->type == constant and b->type==function){
 			deps_count = b->deps_count;
 			deps_list = b->deps_list;
 			l_l = 0;
 			r_l = deps_count;
 			r_ordered =b->deps_list;
 		}
-		else if (b->type == constant){
+		else if (a->type == function and b->type == constant){
 			deps_count = a->deps_count;
 			deps_list = a->deps_list;
 			r_l = 0;
@@ -213,6 +213,7 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 	
 
 	cPrint("output will be " + std::to_string(rows) + " x " + std::to_string(columns));
+
 }
 //init for fns with a single input
 Variable::Variable(Variable *a, std::string *o, bool getDerivs){
@@ -528,4 +529,3 @@ int Variable::getErr(){
 void Variable::resetErr(){
 	err = -199;
 };
-

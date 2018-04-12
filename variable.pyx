@@ -2,6 +2,7 @@ cimport cython
 from eigency.core cimport *
 from libcpp.string cimport string
 from libcpp.map cimport map
+from libcpp cimport bool
 import numpy as np
 import inspect
 cdef extern from "Variable.h" namespace "calc":
