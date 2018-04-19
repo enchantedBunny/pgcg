@@ -6,6 +6,7 @@
 #include <chrono>
 #include <algorithm>
 #include <math.h>
+#include <Eigen/Dense>
 namespace calc_old {
 	enum vType {independent_old, constant_old, function_old, matrix_old, special_old};
 	class Variable_old {

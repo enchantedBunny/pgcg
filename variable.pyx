@@ -1,5 +1,5 @@
 cimport cython
-from eigency.core cimport *
+
 from libcpp.string cimport string
 from libcpp.map cimport map
 from libcpp cimport bool
@@ -7,7 +7,7 @@ import numpy as np
 import inspect
 cdef extern from "Variable.h" namespace "calc":
     cdef cppclass Variable:
-        Variable(Map[MatrixXd]);
+        Variable(Map[MatrixXd] &);
         Variable(int r, int c);
         Variable(Variable *a, Variable *b, string *op);
         Variable(Variable *a, string *op, string *op);
@@ -19,34 +19,24 @@ cdef extern from "Variable.h" namespace "calc":
         void show()
         void resetErr()
         int getErr()
+    MatrixXd differentiate(Variable *a, Variable *b, Map[MatrixXd] &i, int it);
+    
 
-#var storing current print setting, quiet mode doesn't print anything except errors, executive mode doesn't even show errors
-mode = "loud"
 cdef int b = 0
 cdef int it = 0
-#debug print fuction for strings
-cdef public void cPrint(string s):
-    if mode =="quiet" or mode == "executive":
-        return
-    print "         ",s.decode('utf8')
-#debug print fuction for matrices
-cdef public void cPrintM(MatrixXd i):
-    if mode =="quiet" or mode == "executive":
-        return
-    print ndarray(i)
-#raise error function
-cdef public void cError(string s):
-    if mode =="executive":
-        return
-    raise ValueError(s.decode('utf8')) 
-#sets mode
-def setMode(n):
-    global mode
-    mode = n 
-#returns mode
-def getMode():
-    global mode
-    return mode
+
+def differeniate(vara,varb,npist):
+    h = 0.00000001
+    npistF = np.copy(npist)
+    for (x,y), value in np.ndenumerate(npist):
+        npist2 = np.copy(npist)
+        npist2[x][y] += h
+        npistF[x][y]= (sum(vara.value(dict([(varb,npist)]))) - sum(vara.value(dict([(varb,npist2)]))))/h
+    return npistF
+
+
+    #return 6
+
 #one call for all function variable inits
 def function(a, b, inop=None):
     g = var("function")
@@ -74,7 +64,8 @@ def stochastic_constant(arr, rows):
 def variable(rows, cols):
     g = var("independent", rows, cols)
     return g
-    
+def bim():
+    return "bam"
 cdef class var:
     cdef:
         Variable *thisptr
@@ -179,4 +170,29 @@ cdef class var:
             setMode(m)
         else:
             self.thisptr.show()
-        
+    def derivValue(self, dID,h, dIn):
+        self.thisptr.resetErr()
+        for key in dIn:
+            self.thisptr.setValue(key.getID(), Map[MatrixXd](dIn[key]))
+        if not self.thisptr.getErr()>0:
+            global it
+            it += 1
+            out = ndarray(self.thisptr.getValue(it))
+            self.thisptr.setItID(it)
+            fx =  out 
+            for key in dIn:
+                if dID == key.getID():
+                     weightss = np.copy(dIn[key])
+                     weightss[0] + h
+                     self.thisptr.setValue(key.getID(), Map[MatrixXd](weightss))
+                else:
+                    self.thisptr.setValue(key.getID(), Map[MatrixXd](dIn[key]))
+            if not self.thisptr.getErr()>0:
+                global it
+                it += 1
+                out = ndarray(self.thisptr.getValue(it))
+                self.thisptr.setItID(it)
+                fxh =  out 
+                print(fx)
+                print(fxh)
+                print((sum(np.square(fxh))-sum(np.square(fx)))/h)

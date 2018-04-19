@@ -1,5 +1,6 @@
 #include "Variable_old.h"
 #include <Python.h>
+#include "master.h"
 using namespace calc_old;
 // 	cPrint("preview:"); will print preview :)
 Variable_old::Variable_old()

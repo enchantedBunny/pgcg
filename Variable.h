@@ -14,11 +14,12 @@ namespace calc {
 			int rows = -1;
 			int columns = -2;
 			void setID(int bId);
+			int getID();
 			int deps_count;
 			int opperand =1;
 			void setOpperand(int p);
 			//constant
-			Variable(const Eigen::MatrixXd &mat);
+			Variable(const Eigen::Map<Eigen::MatrixXd> &mat);
 			Eigen::MatrixXd val;
 			Eigen::MatrixXd lastVal;
 			void show();
@@ -42,6 +43,8 @@ namespace calc {
 			//Eigen::MatrixXd getValue(const Eigen::MatrixXd &in);
 			Eigen::MatrixXd getValue(int it); //from now on get value will only get the value, you feed the data before that
 			Eigen::MatrixXd getLastValue();
-			void setValue(int targetID, const Eigen::MatrixXd &in);
+			void setValue(int targetID, const Eigen::Map<Eigen::MatrixXd> &in);
 	};
+	Eigen::MatrixXd differentiate(Variable *a, Variable *b, const Eigen::Map<Eigen::MatrixXd> &in,int it);
+	
 } 

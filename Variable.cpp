@@ -1,9 +1,40 @@
 #include "Variable.h"
 #include <Python.h>
-#include "variable.h"
+#include "master.h"
 #include "Helpers.h"
 #include "helpers.h"
 using namespace calc;
+
+
+Eigen::MatrixXd differentiate(Variable *a, Variable *b, const Eigen::Map<Eigen::MatrixXd> &in,int it){
+	// h = 0.00000001
+    // npistF = np.copy(npist)
+    // for (x,y), value in np.ndenumerate(npist):
+    //     npist2 = np.copy(npist)
+    //     npist2[x][y] += h
+    //     npistF[x][y]= (sum(vara.value(dict([(varb,npist)]))) - sum(vara.value(dict([(varb,npist2)]))))/h
+    // return npistF
+
+	double h = 0.00000001;
+	int bID = b->getID();
+	Eigen::MatrixXd inF = in.replicate(1,1);
+	a->setValue(bID, in);
+	double bf = a->getValue(it).sum();
+	for (int x=0; x<in.rows();x++){
+		for (int y=0; y<in.cols();y++){
+			Eigen::MatrixXd in2 = in.replicate(1,1);
+			in2(x,y) += h;
+			//float *p = &in2(0,0);  // get the address storing the data for m2
+			Eigen::Map<Eigen::MatrixXd> in22(in2.data(),in2.rows(),in2.cols());
+			a->setValue(bID, in22);
+			inF(x,y) = (bf-a->getValue(it).sum())/h;
+			
+	}
+	}
+
+	return inF;
+}
+
 //this shouldn't be necessary, figure it out!!!
 //square? - duh -
 long double sq(long double x)
@@ -37,8 +68,12 @@ long double sigmoid_rx(long double x)
 void Variable::setID(int bId){
 	id = bId;
 }
+
+int Variable::getID(){
+	return id;
+}
 //init for constants
-Variable::Variable(const Eigen::MatrixXd &mat){
+Variable::Variable(const Eigen::Map<Eigen::MatrixXd> &mat){
 	type = constant;
 	deps_count = 0;
 	val = mat.transpose();
@@ -85,6 +120,7 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 			else if (a->type == independent){
 				l_ordered = new int[1];
 				l_ordered[0] = {a->id};
+
 				l_l = 1;
 			}
 			if (b->type == function){
@@ -247,7 +283,7 @@ void Variable::setOpperand(int p){
 	opperand = p;
 };
 //setter function fills the tree, used before getValue()
-void Variable::setValue(int targetID, const Eigen::MatrixXd &in){
+void Variable::setValue(int targetID, const Eigen::Map<Eigen::MatrixXd> &in){
 	if (id == targetID){
 		if (rows == in.rows() && columns == in.cols()){
 			val = in;
@@ -345,7 +381,7 @@ Eigen::MatrixXd Variable::getValue(int it){
 			}
 			lastVal =  l;
 		}
-		//if (op == "unary_square") lastVal =  l.unaryExpr(&sq);
+		if (op == "unary_square") lastVal =  l.unaryExpr(&sq);
 		if (op == "unary_pow") lastVal =  l.array().pow(opperand);
 
 		if (op == "rowsum") lastVal =  l.rowwise().sum();
