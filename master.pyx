@@ -3,19 +3,11 @@ from eigency.core cimport *
 include "variable.pyx"
 include "variable_old.pyx"
 
-def differeniate_c(var vara,var varb,np.ndarray npist):
-    global it
-    it += 1
-    cdef Variable *l = vara.thisptr
-    cdef Variable *r = varb.thisptr
-    #same as differeniate but in c with eigen
-    out =  ndarray(differentiate(l,r, Map[MatrixXd](npist), it));
-    it +=100
-    return out
-
-
 #var storing current print setting, quiet mode doesn't print anything except errors, executive mode doesn't even show errors
 mode = "loud"
+
+
+
 
 #debug print fuction for strings
 cdef public void cPrint(string s):

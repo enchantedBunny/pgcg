@@ -19,8 +19,6 @@ cdef extern from "Variable.h" namespace "calc":
         void show()
         void resetErr()
         int getErr()
-    MatrixXd differentiate(Variable *a, Variable *b, Map[MatrixXd] &i, int it);
-    
 
 cdef int b = 0
 cdef int it = 0
@@ -55,17 +53,11 @@ def function(a, b, inop=None):
 def constant(arr):
     g = var("constant", arr)
     return g
-#call for stochastic function variable inits
-def stochastic_constant(arr, rows):
-    g = var("constant", arr)
-    g.stochastic(rows)
-    return g
 #one call for all variable inits
 def variable(rows, cols):
     g = var("independent", rows, cols)
     return g
-def bim():
-    return "bam"
+
 cdef class var:
     cdef:
         Variable *thisptr
@@ -130,9 +122,6 @@ cdef class var:
         b +=1
         self.thisptr.setID(b)
         self.ID = b
-    #init fn for stochastic constants, NOT READY YET, MIGHT REMOVE LATER
-    def stochastic(self,r):
-        self.thisptr.setOpperand(r);
     #getter for ID duh
     def getID(self):
         return self.ID

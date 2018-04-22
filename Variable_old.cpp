@@ -147,15 +147,15 @@ std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bo
 			//cPrint("right has a dep: " + std::to_string(right->allOrderedDeps[0]));
 			bool inleft = std::find(std::begin(left->allOrderedDeps), std::end(left->allOrderedDeps), allOrderedDeps[gg]) != std::end(left->allOrderedDeps);
 			bool inright = std::find(std::begin(right->allOrderedDeps), std::end(right->allOrderedDeps), allOrderedDeps[gg]) != std::end(right->allOrderedDeps);
-			//cPrint("bef");
-			//cPrint(inleft ? "inleft: true":"inleft: false");
-			//cPrint(inright ? "inright: true":"inright: false");
+			cPrint("bef");
+			cPrint(inleft ? "inleft: true":"inleft: false");
+			cPrint(inright ? "inright: true":"inright: false");
 			if (left->id == allOrderedDeps[gg] || left->countOrderedDeps == 1)inleft = true;
 			else if (left->type ==independent_old || left->type ==constant_old) inleft = false;
 			if (right->id == allOrderedDeps[gg] || right->countOrderedDeps == 1)inright = true;
 			else if (right->type ==independent_old || right->type ==constant_old) inright = false;
-			//cPrint(inleft ? "inleft: true":"inleft: false");
-			//cPrint(inright ? "inright: true":"inright: false");
+			cPrint(inleft ? "inleft: true":"inleft: false");
+			cPrint(inright ? "inright: true":"inright: false");
 			Variable_old* wip = new Variable_old;
 			if (right->id == allOrderedDeps[gg] && left->id == allOrderedDeps[gg] ){  //a a 
 				derivs[gg] = directDerivs[0]; //which equalts directDerivs[1]
@@ -230,15 +230,33 @@ std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bo
 				while (c<right->countOrderedDeps){
 					if (right->allOrderedDeps[c] == allOrderedDeps[gg]){
 
-					//cPrint("it's " + std::to_string(c));
+					cPrint("it's " + std::to_string(c));
 						break;
 					}
 					c++;
 				}
 				//LAZY  
-				wip->f(directDerivs[1], right->derivs[0], mult, false);
-				derivs[0] = wip;
-				}	
+
+				float v[1] = {0};  
+				wip->f(directDerivs[1], right->derivs[c], mult, false);
+				derivs[gg] = wip;
+
+				cPrint(std::to_string(directDerivs[1]->getValue(v)));
+				cPrint(std::to_string(right->derivs[c]->getValue(v)));
+				cPrint("wip " + std::to_string(wip->getValue(v)));
+				std::string* multut = new std::string;
+				*multut = "*";
+				Variable_old* wip22 = new Variable_old;
+				wip22->f(directDerivs[1], right->derivs[c], multut, false);
+				
+
+				cPrint("wip22 " + std::to_string(wip22->getValue(v)));
+
+				derivs[gg] = wip22;
+
+				cPrint("derv " + std::to_string(derivs[gg]->getValue(v)));
+				
+			}	
 			//else cPrint("probably error :D");
 			
 		}
@@ -470,7 +488,8 @@ float Variable_old::getValue(float *v)
 	}
 	float lv = left->getValue(lout);
 	float rv = right->getValue(rout);
-
+	cPrint("left value: "  + std::to_string(lv));
+	cPrint("right value: " +std::to_string(rv));
 	if (op == "+")return  lv + rv;
 	if (op == "-")return  lv - rv;
 	if (op == "*")return  lv * rv;
@@ -502,6 +521,6 @@ float Variable_old::getDerivValue(int g,float *v){
 	// 		help++;
 	// 	}
 	// }
-	//return derivs[g]->getValue(v);
-	return directDerivs[1]->getValue(v) * right->derivs[0]->getValue(v);
+	return derivs[g]->getValue(v);
+	//return directDerivs[1]->getValue(v) * right->derivs[0]->getValue(v);
 }

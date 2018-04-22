@@ -15,24 +15,24 @@ Eigen::MatrixXd differentiate(Variable *a, Variable *b, const Eigen::Map<Eigen::
     //     npistF[x][y]= (sum(vara.value(dict([(varb,npist)]))) - sum(vara.value(dict([(varb,npist2)]))))/h
     // return npistF
 
-	double h = 0.00000001;
-	int bID = b->getID();
-	Eigen::MatrixXd inF = in.replicate(1,1);
-	a->setValue(bID, in);
-	double bf = a->getValue(it).sum();
-	for (int x=0; x<in.rows();x++){
-		for (int y=0; y<in.cols();y++){
-			Eigen::MatrixXd in2 = in.replicate(1,1);
-			in2(x,y) += h;
-			//float *p = &in2(0,0);  // get the address storing the data for m2
-			Eigen::Map<Eigen::MatrixXd> in22(in2.data(),in2.rows(),in2.cols());
-			a->setValue(bID, in22);
-			inF(x,y) = (bf-a->getValue(it).sum())/h;
+	// double h = 0.00000001;
+	// int bID = b->getID();
+	// Eigen::MatrixXd inF = in.replicate(1,1);
+	// a->setValue(bID, in);
+	// double bf = a->getValue(it).sum();
+	// for (int x=0; x<in.rows();x++){
+	// 	for (int y=0; y<in.cols();y++){
+	// 		Eigen::MatrixXd in2 = in.replicate(1,1);
+	// 		in2(x,y) += h;
+	// 		//float *p = &in2(0,0);  // get the address storing the data for m2
+	// 		Eigen::Map<Eigen::MatrixXd> in22(in2.data(),in2.rows(),in2.cols());
+	// 		a->setValue(bID, in22);
+	// 		inF(x,y) = (bf-a->getValue(it).sum())/h;
 			
-	}
-	}
+	// }
+	// }
 
-	return inF;
+	// return inF;
 }
 
 //this shouldn't be necessary, figure it out!!!
@@ -388,10 +388,7 @@ Eigen::MatrixXd Variable::getValue(int it){
 		if (op == "colsum") lastVal =  l.colwise().sum();
 
 		if (op == "transpose") lastVal =  l.transpose();
-		if (op== "stochastic") 
-		{
-		lastVal = l;
-		}
+		
 		return lastVal;
 	}
 	if (right == nullptr)return l;
