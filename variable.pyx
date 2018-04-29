@@ -13,7 +13,6 @@ cdef extern from "Variable.h" namespace "calc":
         Variable(Variable *a, string *op, string *op);
         void setID(int bId);
         MatrixXd getValue(int it);
-        void setItID(int it);
         void setValue(int, Map[MatrixXd] &);
         void setOpperand(int p)
         void show()
@@ -23,17 +22,15 @@ cdef extern from "Variable.h" namespace "calc":
 cdef int b = 0
 cdef int it = 0
 
-def differeniate(vara,varb,npist):
+#returns derivative of vara with respect to varb. npist should be the point at which. All other 'variables' in tree should have value
+def differentiate(vara,varb,npist):
     h = 0.00000001
     npistF = np.copy(npist)
     for (x,y), value in np.ndenumerate(npist):
         npist2 = np.copy(npist)
         npist2[x][y] += h
-        npistF[x][y]= (sum(vara.value(dict([(varb,npist)]))) - sum(vara.value(dict([(varb,npist2)]))))/h
+        npistF[x][y]= (sum(vara.value(dict([(varb,npist2)]))) - sum(vara.value(dict([(varb,npist)]))))/h
     return npistF
-
-
-    #return 6
 
 #one call for all function variable inits
 def function(a, b, inop=None):
@@ -47,8 +44,8 @@ def function(a, b, inop=None):
     elif type(a) == var and type(b)==str and type(inop) == int:
         g.sf2(a, b, inop)
         return g
-    #add a thing for pow and such 
     print("I don't get it")
+    
 #call for all constant inits
 def constant(arr):
     g = var("constant", arr)
@@ -122,66 +119,22 @@ cdef class var:
         b +=1
         self.thisptr.setID(b)
         self.ID = b
-    #getter for ID duh
+    #getter for ID
     def getID(self):
         return self.ID
     #getter for value
-    def value(self, dIn=None, egg = True):
+    def value(self, dIn=None,):
         self.thisptr.resetErr()
         if dIn != None:
             for key in dIn:
                 self.thisptr.setValue(key.getID(), Map[MatrixXd](dIn[key]))
-        if self.thisptr.getErr()>0:
-            egg = False
-        if egg:
+        if self.thisptr.getErr()<0:
             global it
             it += 1
             out = ndarray(self.thisptr.getValue(it))
-            self.thisptr.setItID(it)
             return out
     #returns a new variable that is a transposed version of this one
     def T(self):
         g = var("function")
         g.sf(self, "transpose")
         return g
-    #returns a derivative of f(x) for some type ONE functions
-    def deriv(self):
-        g = var("function")
-        if self.t2 == "one":
-            g.sf(self, self.inop + "_r")
-        return g
-    #prints a debug preview
-    def preview(self):
-        m = getMode()
-        if m == "quiet" or m == "executive":
-            setMode("loud")
-            self.thisptr.show()
-            setMode(m)
-        else:
-            self.thisptr.show()
-    def derivValue(self, dID,h, dIn):
-        self.thisptr.resetErr()
-        for key in dIn:
-            self.thisptr.setValue(key.getID(), Map[MatrixXd](dIn[key]))
-        if not self.thisptr.getErr()>0:
-            global it
-            it += 1
-            out = ndarray(self.thisptr.getValue(it))
-            self.thisptr.setItID(it)
-            fx =  out 
-            for key in dIn:
-                if dID == key.getID():
-                     weightss = np.copy(dIn[key])
-                     weightss[0] + h
-                     self.thisptr.setValue(key.getID(), Map[MatrixXd](weightss))
-                else:
-                    self.thisptr.setValue(key.getID(), Map[MatrixXd](dIn[key]))
-            if not self.thisptr.getErr()>0:
-                global it
-                it += 1
-                out = ndarray(self.thisptr.getValue(it))
-                self.thisptr.setItID(it)
-                fxh =  out 
-                print(fx)
-                print(fxh)
-                print((sum(np.square(fxh))-sum(np.square(fx)))/h)

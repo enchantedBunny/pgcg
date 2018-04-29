@@ -18,14 +18,11 @@ namespace calc {
 			int deps_count;
 			int opperand =1;
 			void setOpperand(int p);
-			//constant
 			Variable(const Eigen::Map<Eigen::MatrixXd> &mat);
 			Eigen::MatrixXd val;
 			Eigen::MatrixXd lastVal;
 			void show();
-			//independent
 			Variable(int &r, int &c);
-			//function
 			int *deps_list;
 			Variable *left;
 			Variable *right;
@@ -37,14 +34,10 @@ namespace calc {
 			int err = -199;
 			int getErr();
 			void resetErr();
-			void setItID(int it);
 			Variable(Variable *a, Variable *b, std::string *op, bool getDerivs = true);
 			Variable(Variable *a, std::string *op, bool getDerivs = true);
-			//Eigen::MatrixXd getValue(const Eigen::MatrixXd &in);
 			Eigen::MatrixXd getValue(int it); //from now on get value will only get the value, you feed the data before that
 			Eigen::MatrixXd getLastValue();
 			void setValue(int targetID, const Eigen::Map<Eigen::MatrixXd> &in);
 	};
-	Eigen::MatrixXd differentiate(Variable *a, Variable *b, const Eigen::Map<Eigen::MatrixXd> &in,int it);
-	
 } 

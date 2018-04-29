@@ -1,42 +1,9 @@
 #include "Variable.h"
 #include <Python.h>
 #include "master.h"
-#include "Helpers.h"
-#include "helpers.h"
 using namespace calc;
 
-
-Eigen::MatrixXd differentiate(Variable *a, Variable *b, const Eigen::Map<Eigen::MatrixXd> &in,int it){
-	// h = 0.00000001
-    // npistF = np.copy(npist)
-    // for (x,y), value in np.ndenumerate(npist):
-    //     npist2 = np.copy(npist)
-    //     npist2[x][y] += h
-    //     npistF[x][y]= (sum(vara.value(dict([(varb,npist)]))) - sum(vara.value(dict([(varb,npist2)]))))/h
-    // return npistF
-
-	// double h = 0.00000001;
-	// int bID = b->getID();
-	// Eigen::MatrixXd inF = in.replicate(1,1);
-	// a->setValue(bID, in);
-	// double bf = a->getValue(it).sum();
-	// for (int x=0; x<in.rows();x++){
-	// 	for (int y=0; y<in.cols();y++){
-	// 		Eigen::MatrixXd in2 = in.replicate(1,1);
-	// 		in2(x,y) += h;
-	// 		//float *p = &in2(0,0);  // get the address storing the data for m2
-	// 		Eigen::Map<Eigen::MatrixXd> in22(in2.data(),in2.rows(),in2.cols());
-	// 		a->setValue(bID, in22);
-	// 		inF(x,y) = (bf-a->getValue(it).sum())/h;
-			
-	// }
-	// }
-
-	// return inF;
-}
-
-//this shouldn't be necessary, figure it out!!!
-//square? - duh -
+//square
 long double sq(long double x)
 {
     return x*x;
@@ -45,6 +12,10 @@ long double sq(long double x)
 long double ln(long double x)
 {
     return std::log(x);
+}
+long double expn(long double x)
+{
+    return std::exp(x);
 }
 //1/(1+e^-x)
 long double sigmoid(long double x)
@@ -87,32 +58,18 @@ Variable::Variable(int &r, int &c){
 	rows = r;
 	columns = c;
 	cPrint("rows " + std::to_string(rows) + " colss " + std::to_string(columns));
-
 }
 // init for fns with 2 inputs
 Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 	type = function;
+	ftype = two;
 	left = a;
 	right = b;
 	rows = left->rows;
 	columns = right->columns;
 	op = *o;
 	if (a->type == function or b->type==function){
-		if (a->type == constant and b->type==function){
-			deps_count = b->deps_count;
-			deps_list = b->deps_list;
-			l_l = 0;
-			r_l = deps_count;
-			r_ordered =b->deps_list;
-		}
-		else if (a->type == function and b->type == constant){
-			deps_count = a->deps_count;
-			deps_list = a->deps_list;
-			r_l = 0;
-			l_l = deps_count;
-			l_ordered = deps_list;
-		}
-		else{	
+		
 			if (a->type == function){
 				l_ordered = a->deps_list;
 				l_l = a->deps_count;
@@ -167,27 +124,20 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 					deps_list[i] = l_ordered[li];
 					li++;
 				}
+			
 			}
-		}
 	}
 	else{
-		if ( a->id == b->id){
+		if ( a->id == b->id && a->type == independent){
 			deps_count = 1;
 			deps_list = new int[1];
 			deps_list[0] = a->id;
-			if (a->type == independent){
-				l_l = 1;
-				r_l = 1;
-				l_ordered = new int[1];
-				l_ordered[0] = {b->id};
-				r_ordered = new int[1];
-				r_ordered[0] = {b->id};
-			}
-			else{
-				l_l = 0;
-				r_l = 0;
-			}
-
+			l_l = 1;
+			r_l = 1;
+			l_ordered = new int[1];
+			l_ordered[0] = {b->id};
+			r_ordered = new int[1];
+			r_ordered[0] = {b->id};
 		}
 		else if ( a->type == independent and b->type == independent){
 			deps_count = 2;
@@ -201,7 +151,7 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 			r_ordered = new int[1];
 			r_ordered[0] = {b->id};
 		}
-		else if (a->type == independent and b->type == constant){
+		else if (a->type == independent){
 			deps_count = 1;
 			deps_list = new int[1];
 			deps_list[0] = a->id;
@@ -210,7 +160,7 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 			l_ordered = new int[1];
 			l_ordered[0] = {a->id};
 		}
-		else if (a->type == constant and b->type == independent){
+		else if (b->type == independent){
 			deps_count = 1;
 			deps_list = new int[1];
 			deps_list[0] = b->id;
@@ -219,37 +169,36 @@ Variable::Variable(Variable *a, Variable *b, std::string *o, bool getDerivs){
 			r_ordered = new int[1];
 			r_ordered[0] = {b->id};
 		}
+		else{
+			deps_count = 0;
+			l_l = 0;
+			r_l = 0;
+		}
 		
 	}
 	
 	if (op == "*" && left->columns == right->rows){
 		cPrint("valid");
 	}
-	else if (op == "+" && left->columns == right->columns && left->rows == right->rows){
+	else if ((op == "+" || op == "elementwise*" || op == "elementwise/" || op == "-") && left->columns == right->columns && left->rows == right->rows){
 		cPrint("valid");
 		rows = left->rows;
 		columns = left->columns;
 	}
-	else if (op == "-" && left->columns == right->columns && left->rows == right->rows){
+	else if ((op == "rowwise*" || op == "colwise*" ) && (left->columns == right->columns || left->rows == right->columns|| left->columns == right->rows|| left->rows == right->rows)){
 		cPrint("valid");
 		rows = left->rows;
+		if (left->rows < right->rows)
+		rows = right->rows;
 		columns = left->columns;
-	}
-	else if (op == "rowwise*" && left->columns == right->columns && left->rows == right->rows){
-		cPrint("valid");
-		rows = left->rows;
-		columns = left->columns;
+		if (left->columns < right->columns)
+		columns = right->columns;
 	}
 	else{
 		err = 2;
-		// error value 2  => operation invalid
 		cError("<invalid operation: " + op + " >left is a " + std::to_string(left->rows) +"x" + std::to_string(left->columns) + " matrix but right is a " + std::to_string(right->rows) +"x" + std::to_string(right->columns) + " matrix");
 
 	}
-	
-
-	cPrint("output will be " + std::to_string(rows) + " x " + std::to_string(columns));
-
 }
 //init for fns with a single input
 Variable::Variable(Variable *a, std::string *o, bool getDerivs){
@@ -257,14 +206,14 @@ Variable::Variable(Variable *a, std::string *o, bool getDerivs){
 	ftype = one;
 	left = a;
 	op = *o;
+	if (op == "unary_pow") ftype = one_plus;
 	if (op == "transpose") {
 		rows = left->columns;
 		columns = left->rows;
-		cPrint("trans");
 	}
 	else{
 		rows = left->rows;
-	columns = left->columns;
+		columns = left->columns;
 	}
 	deps_count = a->deps_count;
 	deps_list = a->deps_list;
@@ -273,10 +222,6 @@ Variable::Variable(Variable *a, std::string *o, bool getDerivs){
 	r_l = 0;
 
 	cPrint("output will be " + std::to_string(rows) + " x " + std::to_string(columns));
-}
-//debug fn that shows info about variable
-void Variable::show(){
-	cPrint("My ID is " + std::to_string(id) + " and myoutput will be " + std::to_string(rows) + " x " + std::to_string(columns));
 }
 //setter for additional opperand some functions use (e.g. pow)
 void Variable::setOpperand(int p){
@@ -294,7 +239,6 @@ void Variable::setValue(int targetID, const Eigen::Map<Eigen::MatrixXd> &in){
 		else {
 			val = in;
 			err = 1;
-			// error value 1  => value doesn't fit
 			cError("this value doesn't fit");
 			cError("expected a " + std::to_string(rows) +"x" + std::to_string(columns) + " matrix");
 			cError("but received a " + std::to_string(in.rows()) +"x" + std::to_string(in.cols()) + " matrix");
@@ -303,7 +247,7 @@ void Variable::setValue(int targetID, const Eigen::Map<Eigen::MatrixXd> &in){
 	else if(type==function){
 		if (left->id == targetID){
 			left->setValue(targetID, in);}
-		else if (l_l == deps_count){
+		else if (ftype == one){
 			left->setValue(targetID, in);
 		}
 		else if (right->id == targetID){
@@ -312,6 +256,7 @@ void Variable::setValue(int targetID, const Eigen::Map<Eigen::MatrixXd> &in){
 			for (int i = 0; i<l_l; i++){
 				if (l_ordered[i] == targetID){
 					left->setValue(targetID, in);
+					return;
 				}
 			}
 			for (int i = 0; i<r_l; i++){
@@ -323,235 +268,149 @@ void Variable::setValue(int targetID, const Eigen::Map<Eigen::MatrixXd> &in){
 	}
 	
 }
-// setter fn for iteration ID - REDUNDANT -> IT'S DONE BY getValue, adding this was a stupid mistake
-void Variable::setItID(int it){
-	itid = it;
-	if (l_l > 0){
-		left->setItID(it);
-	}
-	if (r_l > 0){
-		right->setItID(it);
-	} 
-}
 // getter function which finds and spits out value- will merge this with the setter so that value is always calculated as the numbers are filled in
 Eigen::MatrixXd Variable::getValue(int it){
-
 	if (type == independent) return val;
 	if (type == constant) return val;
 	
 
 	if (itid == it){ //this fn for this var has already been executed, ergo we can use lastValue
 		return lastVal;
-	}itid = it;
+	}
 	
+	itid = it;
 	
 	Eigen::MatrixXd l = left->getValue(it);
-	if (ftype == one){
-		if (op == "sigmoid_r") lastVal = l.unaryExpr(&sigmoid_ry);
-		if (op == "sigmoid") lastVal =  l.unaryExpr(&sigmoid);
-		if (op == "ln") lastVal =  l.unaryExpr(&ln);
-		if (op == "softmax") {
-			if (l.rows()==1){
-				l = l.transpose();
-			}
-			for (int j =0; j<l.rows(); j++){
-				float s = 0;
-				for (int i =0; i<l.cols(); i++){
-					s += std::exp(l(j,i));
-				}
-				for (int i =0; i<l.cols(); i++){
-					l(j,i) = std::exp(l(j,i))/s;
-				}
-			}
-			lastVal =  l;
-		}
-		if (op == "softmax_r") {
-			if (l.rows()==1){
-				l = l.transpose();
-			}
-			for (int j =0; j<l.rows(); j++){
-				float s = 0;
-				for (int i =0; i<l.cols(); i++){
-					s += std::exp(l(j,i));
-				}
-				for (int i =0; i<l.cols(); i++){
-					int a  = std::exp(l(j,i));
-					l(j,i) = ( a * (s - a)   ) /  (s*s);
-				}
-			}
-			lastVal =  l;
-		}
+	
+	if (ftype != two){
 		if (op == "unary_square") lastVal =  l.unaryExpr(&sq);
-		if (op == "unary_pow") lastVal =  l.array().pow(opperand);
+		else if (op == "unary_pow") lastVal =  l.array().pow(opperand);
+		else if (op == "transpose") lastVal =  l.transpose();
+		else if (op == "sigmoid") lastVal =  l.unaryExpr(&sigmoid);
+		else if (op == "sigmoid_r") lastVal = l.unaryExpr(&sigmoid_ry);
+		else if (op == "ln") lastVal =  l.unaryExpr(&ln);
+		else if (op == "exp") lastVal =  l.unaryExpr(&expn);
+		else if (op == "rowsum") lastVal =  l.rowwise().sum();
+		else if (op == "colsum") lastVal =  l.colwise().sum();
 
-		if (op == "rowsum") lastVal =  l.rowwise().sum();
-		if (op == "colsum") lastVal =  l.colwise().sum();
-
-		if (op == "transpose") lastVal =  l.transpose();
-		
 		return lastVal;
 	}
+	
 	if (right == nullptr)return l;
+	
 	Eigen::MatrixXd r = right->getValue(it);
 
-	
-	// cPrint("r");
-	// cPrintM(r);
-	
-	// if (op == "rowwise*") {
-	// 	if (r.cols()==1){
-	// 		r = r.transpose();
-	// 	}
-	// 	Eigen::VectorXd v(r.cols());
-	// 	for (int i = 0; i< r.cols(); i++)
-	// 		v(i)=r(0,i);
-	// 	l.array().rowwise() *= v.array().transpose();
-	// 	return l;}
-	if (ftype != one){
-		if (op == "colwise*") { //I think this is colwise* .. oh well
-			if (r.rows()==1){
-				r = r.transpose();
-			}
-			if (l.rows()==1){
-				l = l.transpose();
-			}
-			if (l.rows() != r.rows()){
-				cError("cannot do colwsie*, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
-				return r;
-			}
-			else if (l.cols()!=1 && r.cols()!=1){
-				cError("cannot do rowwsie*, neither is a column vector");
-				return r;
-			}
-			bool right = false;
-			int cols = r.cols();
-			int rows = l.rows();
-			if (cols==1){
-				right = true;
-				cols = l.cols();
-			}
-			for (int g = 0; g<rows; g++){
-				for (int i = 0; i< cols; i++)
-				{
-					if (right)
-						l(g,i) *= r(g,0);
-					else
-						r(g,i) *= l(g,0);
-				}
-			}
-			if (right)	
-				lastVal = l;
-			else
-				lastVal = r;
+	if (op == "+")lastVal = l + r;
+	else if (op == "-")lastVal = l - r;
+	else if (op == "*") lastVal = l * r;
+	else if (op == "elementwise*") {
+		if (l.cols() != r.cols()){
+			cError("cannot do elementwise*, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
+			return r;
 		}
-		if (op == "elementwise*") {
-			if (l.cols() != r.cols()){
-				cError("cannot do elementwise*, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
-				return r;
-			}
-			if (l.rows() != r.rows()){
-				cError("cannot do elementwise*, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
-				return r;
-			}
-			for (int g = 0; g<l.rows(); g++){
-				for (int i = 0; i< l.cols(); i++)
-				{
-					l(g,i) *= r(g,i);
-				}
-			}
-			lastVal = l;
-			
+		if (l.rows() != r.rows()){
+			cError("cannot do elementwise*, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
+			return r;
 		}
-		if (op == "elementwise/") {
-			if (l.cols() != r.cols()){
-				cError("cannot do elementwise/, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
-				return r;
+		for (int g = 0; g<l.rows(); g++){
+			for (int i = 0; i< l.cols(); i++)
+			{
+				l(g,i) *= r(g,i);
 			}
-			if (l.rows() != r.rows()){
-				cError("cannot do elementwise/, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
-				return r;
-			}
-			for (int g = 0; g<l.rows(); g++){
-				for (int i = 0; i< l.cols(); i++)
-				{
-					l(g,i) /= r(g,i);
-				}
-			}
-			lastVal = l;
-			
 		}
-		if (op == "rowwise*") {
-			if (r.cols()==1){
-				r = r.transpose();
-			}
-			if (l.cols()==1){
-				l = l.transpose();
-			}
-			if (l.cols() != r.cols()){
-				cError("cannot do rowwsie*, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
-				return r;
-			}
-			else if (l.rows()!=1 && r.rows()!=1){
-				cError("cannot do rowwsie*, neither is a row vector");
-				return r;
-			}
-			bool right = false; //right is not a row vector
-			int cols = l.cols();
-			int rows = r.rows();
-			if (rows==1){
-				right = true;
-				rows = l.rows();
-			}
-			for (int g = 0; g<rows; g++){
-				for (int i = 0; i< cols; i++)
-				{
-					if (right)
-						l(g,i) *= r(0,i);
-					else
-						r(g,i) *= l(0,i);
-				}
-			}
-			if (right)	
-				lastVal = l;
-			else
-				lastVal = r;
-		}
-		if (op == "rowwise*OLD") {
-			if (r.cols()==1){
-				r = r.transpose();
-			}
-			cPrintM(r);
-			int hh = r.rows();
-			bool isr = true;
-			if (hh ==1){
-				isr = false;
-				hh =l.rows();
-			}
-			for (int g = 0; g<hh; g++)
-				for (int i = 0; i< r.cols(); i++)
-					l(g,i) *= r(isr ? g : 0,i);
-				
-			lastVal = l;
-		}
-		if (op == "rowwise-") {
-			if (r.cols()==1){
-				r = r.transpose();
-			}
-			Eigen::VectorXd v(r.cols());
-			for (int i = 0; i< r.cols(); i++)
-				v(i)=r(0,i);
-			l.array().rowwise() -= v.array().transpose();
-			lastVal = l;}
-
-		if (op == "+")lastVal = l + r;
-		if (op == "-")lastVal = l - r;
-		if (op == "*") lastVal = l * r; //figure out which kind of multiplication (matrix vs scalar)
-		if (op == "/")lastVal = l / r(0,0);
-		return lastVal;
+		lastVal = l;
 	}
-}
-// getter that doesn't compute the value again
-Eigen::MatrixXd Variable::getLastValue(){
+	else if (op == "elementwise/") {
+		if (l.cols() != r.cols()){
+			cError("cannot do elementwise/, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
+			return r;
+		}
+		if (l.rows() != r.rows()){
+			cError("cannot do elementwise/, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
+			return r;
+		}
+		for (int g = 0; g<l.rows(); g++){
+			for (int i = 0; i< l.cols(); i++)
+			{
+				l(g,i) /= r(g,i);
+				}
+		}
+		lastVal = l;
+	}
+	else if (op == "rowwise*") {
+		if (r.cols()==1){
+			r = r.transpose();
+		}
+		if (l.cols()==1){
+			l = l.transpose();
+		}
+		if (l.cols() != r.cols()){
+			cError("cannot do rowwise*, size mismatch, left is " + std::to_string(l.cols()) + " while right is" +std::to_string(r.cols()) );
+			return r;
+		}
+		else if (l.rows()!=1 && r.rows()!=1){
+			cError("cannot do rowwise*, neither is a row vector");
+			return r;
+		}
+		bool right = false; //right is not a row vector
+		int cols = l.cols();
+		int rows = r.rows();
+		if (rows==1){
+			right = true;
+			rows = l.rows();
+		}
+		for (int g = 0; g<rows; g++){
+			for (int i = 0; i< cols; i++)
+			{
+				if (right)
+					l(g,i) *= r(0,i);
+				else
+					r(g,i) *= l(0,i);
+			}
+		}
+		if (right)	
+			lastVal = l;
+		else
+			lastVal = r;
+	}
+	else if (op == "colwise*") { //I think this is colwise* .. oh well
+		if (r.rows()==1){
+			r = r.transpose();
+		}
+		if (l.rows()==1){
+			l = l.transpose();
+		}
+		if (l.rows() != r.rows()){
+			cError("cannot do colwsie*, size mismatch, left is " + std::to_string(l.rows()) + " while right is" +std::to_string(r.rows()) );
+			return r;
+		}
+		else if (l.cols()!=1 && r.cols()!=1){
+			cError("cannot do rowwsie*, neither is a column vector");
+			return r;
+		}
+		bool right = false;
+		int cols = r.cols();
+		int rows = l.rows();
+		if (cols==1){
+			right = true;
+			cols = l.cols();
+		}
+		for (int g = 0; g<rows; g++){
+			for (int i = 0; i< cols; i++)
+			{
+				if (right)
+					l(g,i) *= r(g,0);
+				else
+					r(g,i) *= l(g,0);
+			}
+		}
+		if (right)	
+			lastVal = l;
+		else
+			lastVal = r;
+	}
+	else lastVal = l;
+
 	return lastVal;
 }
 // getter that prints returns current error code

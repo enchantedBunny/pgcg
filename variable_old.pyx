@@ -10,18 +10,41 @@ cdef extern from "Variable_old.h" namespace "calc_old":
         int id;
         string op;
         float value;
-        string preview();
         Variable_old();
         void setID(int bId);
         float getValue(float *v);
         void c(float value);
         void i();
-        string f(Variable_old *a, Variable_old *b, string *op);
-        string f(Variable_old *a, string* op);
-        string f(Variable_old *a, string *o, int p)
+        void f(Variable_old *a, Variable_old *b, string *op);
+        void f(Variable_old *a, string* op);
+        void f(Variable_old *a, string *o, int p)
         float getDerivValue(int g,float *v);
 cdef int bbbb = 0
 
+#one call for all function variable inits
+def function_old(a, b, inop=None):
+    g = var_old('f')
+    if type(a) == var_old and type(b) == var_old and type(inop)==str:
+        g.f(a, b, inop)
+    elif type(a) == var_old and type(b)==str and inop == None:
+        if b == "exp":
+            g.exp(a)
+        elif b =="sigmoid":
+            g.sigmoid(a)
+    elif type(a) == var_old and b=="pow" and (type(inop) == int or type(inop) == float):
+        g.pow(a, inop)
+    else:
+        print("I don't get it")
+    return g
+    
+#call for all constant inits
+def constant_old(c):
+    g = var_old('c', c)
+    return g
+#one call for all variable inits
+def variable_old():
+    g = var_old('i')
+    return g
 
 cdef class var_old:
     cdef:
@@ -32,8 +55,6 @@ cdef class var_old:
         Variable_old thisptr      # hold a C++ instance which we're wrapping
         var_old l
         var_old r
-    def preview(self):
-        print(self.thisptr.preview().decode('utf8'))
     def __cinit__(self, type=None, val=None):
         global bbbb
         bbbb +=1
@@ -59,25 +80,25 @@ cdef class var_old:
         s = str.encode(inop)
         cdef Variable_old *l = &a.thisptr
         cdef Variable_old *r = &b.thisptr
-        self.thisptr.f(l, r, &s).decode('utf8')
+        self.thisptr.f(l, r, &s)
     def exp(self, var_old a):
         inop = "exp"
         cdef string s
         s = str.encode(inop)
         cdef Variable_old *l = &a.thisptr
-        self.thisptr.f(l, &s).decode('utf8')
+        self.thisptr.f(l, &s)
     def pow(self, var_old a, int g):
         inop = "pow"
         cdef string s
         s = str.encode(inop)
         cdef Variable_old *l = &a.thisptr
-        print(self.thisptr.f(l, &s, g).decode('utf8'))
+        self.thisptr.f(l, &s, g)
     def sigmoid(self, var_old a):
         inop = "sig"
         cdef string s
         s = str.encode(inop)
         cdef Variable_old *l = &a.thisptr
-        print(self.thisptr.f(l, &s).decode('utf8'))
+        self.thisptr.f(l, &s)
     def  getDeriv(self,g,pyfloats):
         cfloats = <float *> malloc(len(pyfloats)*cython.sizeof(float))
         if cfloats is NULL:
@@ -89,31 +110,3 @@ cdef class var_old:
             print("error - nan" + g + pyfloats)
             return -42
         return out
-    def feedDeriv(self,g, floatses):
-        out = []
-        for f in range(len(floatses[0])):
-            ror = [gr[f]  for gr in floatses]
-            print(ror)
-            out.append(self.getDeriv(g,ror))
-        return out
-    def __add__(self,other):
-        h = var_old()
-        h.f(self, other, "+")
-        return h
-    def __sub__(self,other):
-        h = var_old()
-        h.f(self, other, "-")
-        return h
-    def __mul__(self,other):
-        h = var_old()
-        h.f(self, other, "*")
-        return h
-    def __truediv__(self,other):
-        h = var_old()
-        h.f(self, other, "/")
-        return h
-    def __pow__(self,other, em):
-        h = var_old()
-        h.pow(self, other)
-        return h
-            

@@ -40,6 +40,9 @@
         "thread": "cpp",
         "tuple": "cpp",
         "typeinfo": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "algorithm": "cpp",
+        "dense": "cpp",
+        "iterator": "cpp"
     }
 }

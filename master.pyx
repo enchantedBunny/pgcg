@@ -6,14 +6,11 @@ include "variable_old.pyx"
 #var storing current print setting, quiet mode doesn't print anything except errors, executive mode doesn't even show errors
 mode = "loud"
 
-
-
-
 #debug print fuction for strings
 cdef public void cPrint(string s):
     if mode =="quiet" or mode == "executive":
         return
-    print "         ",s.decode('utf8')
+    print s.decode('utf8')
 #debug print fuction for matrices
 cdef public void cPrintM(MatrixXd i):
     if mode =="quiet" or mode == "executive":

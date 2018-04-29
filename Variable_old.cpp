@@ -2,7 +2,6 @@
 #include <Python.h>
 #include "master.h"
 using namespace calc_old;
-// 	cPrint("preview:"); will print preview :)
 Variable_old::Variable_old()
 {
 	
@@ -20,82 +19,171 @@ void Variable_old::c(float v)
 	type = constant_old;	
 	value = v;
 }
-std::string Variable_old::preview(){
-	if (type == constant_old)return "c";
-	if (type == independent_old)return "v" + std::to_string(id);
-	if (type ==  function_old)return "( " + tree[0]  + " " + op + " " + tree[1] + " )";
-	//if (op ==  "pow")cPrint2(std::to_string(pw));
-	if (type ==  special_old)return "( " + op + tree[0] + " )";
-	return "sum( " + tree[0] + " )";
-}
-std::string Variable_old::previewDeriv(){
-	return derivs[0]->preview();
 
-}
-std::string Variable_old::build(){
-	if (type == constant_old)return std::to_string(value);
-	if (type == independent_old)return "v" + std::to_string(id);
-	if (type ==  function_old)return "( " + left->build() + " " + op + " " + right->build() + " )";
-	if (type ==  special_old)return "( " + op + left->build() + " )";
-	return "sum( " + left->build() + " )";
-}
-void Variable_old::buildTree(){
-	tree[0] = left->build();
-	tree[1] = right->build();	
-}
-unsigned short getFirst(std::string &s){
-	size_t l = s.find('v');
-	s[l]='g';
-	std::string out = "";
-	if (s.length()>l+1)if ('0' <= s[l+1] && s[l+1] <= '9'){
-		out += s[l+1];
-		if (s.length()>l+2)if ('0' <= s[l+2] && s[l+2] <= '9'){
-			out += s[l+2];
-			if (s.length()>l+3)if ('0' <= s[l+3] && s[l+3] <= '9')
-				out += s[l+3];
-		}
-	}
-	return atoi(out.c_str());
-}
-std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bool getDerivs)
+void Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bool getDerivs)
 {
 	type = function_old;
 	left = a;
 	right = b;
 	op = *o;
-	buildTree();
-	for (int i = 0;i<2; i++){
-		deps[i] = (unsigned short)std::count(tree[i].begin(), tree[i].end(), 'v');
+	cPrint("here2definition00     " + std::to_string(a->countOrderedDeps));
+	if (a->type == function_old || a->type == special_old){
+		l_l = a->countOrderedDeps;
+		l_ordered = a->allOrderedDeps;
 	}
-	int i2 = 0;
-	while (tree[0].find('v') != std::string::npos){depsList[0][i2] = getFirst(tree[0]);i2++;}
-	i2 = 0;
-	while (tree[1].find('v') != std::string::npos){depsList[1][i2] = getFirst(tree[1]);i2++;}
-	int n = deps[0] + deps[1];
-	unsigned short * allDepsWithDuplicates = new unsigned short[n];
-	std::copy(depsList[0], depsList[0] + deps[0], allDepsWithDuplicates);
-	std::copy(depsList[1], depsList[1] + deps[1], allDepsWithDuplicates + deps[0]);	
-	unsigned short i, j, k;
-	for(i=0;i<n;i++)
-        for(j=i+1;j<n;)
-        {
-            if(allDepsWithDuplicates[i]==allDepsWithDuplicates[j])
-            {
-                for(k=j;k<n-1;++k)
-                    allDepsWithDuplicates[k]=allDepsWithDuplicates[k+1];
-                --n;
-            }
-            else
-                ++j;
-        }
-    std::sort(allDepsWithDuplicates, allDepsWithDuplicates+n);
-	std::string out = "";
-	
-	for(j=0;j<n;j++){
-         allOrderedDeps[j] = allDepsWithDuplicates[j];
-		 out += std::to_string(allOrderedDeps[j]) + " ";
+	else if (a->type == constant_old){
+		l_l = 0;
 	}
-	countOrderedDeps = n;
+	else if (a->type == independent_old){
+		l_l = 1;
+		l_ordered = new unsigned short [1];
+		l_ordered[0] = a->id;
+	}
+	cPrint("here2definition01     " + std::to_string(l_l));
+	if (b->type == function_old || b->type == special_old){
+		r_l = b->countOrderedDeps;
+		r_ordered = b->allOrderedDeps;
+	}
+	else if (b->type == constant_old){
+		r_l = 0;
+	}
+	else if (b->type == independent_old){
+		r_l = 1;
+		r_ordered = new unsigned short [1];
+		r_ordered[0] = b->id;
+	}
+
+	if (a->type == constant_old && (b->type == function_old || b->type == special_old)){
+		allOrderedDeps = b->allOrderedDeps;
+		countOrderedDeps = b->countOrderedDeps;
+		cPrint("here2definition02     " + std::to_string(countOrderedDeps));
+	}
+	else if ((a->type == function_old || a->type == special_old) && b->type == constant_old){
+		allOrderedDeps = a->allOrderedDeps;
+		countOrderedDeps = a->countOrderedDeps;
+		cPrint("here2definition03     " + std::to_string(countOrderedDeps));
+	}
+	else if (a->type == independent_old && b->type == constant_old){
+		allOrderedDeps = new unsigned short[1];
+		allOrderedDeps[0] = a->id;
+		countOrderedDeps = 1;
+	}
+	else if (a->type == constant_old && b->type == independent_old){
+		allOrderedDeps = new unsigned short[1];
+		allOrderedDeps[0] = b->id;
+		countOrderedDeps = 1;
+	}
+	else if (a->type == constant_old && b->type == constant_old){
+		countOrderedDeps = 0;
+	}
+	else if (a->type == independent_old && b->type == independent_old){
+		if (a->id == b->id){
+			countOrderedDeps = 1;
+			allOrderedDeps = new unsigned short [1];
+			allOrderedDeps[0] = a->id;
+		}
+		countOrderedDeps = 2;
+		allOrderedDeps = new unsigned short [2];
+		allOrderedDeps[0] = std::min(a->id, b->id);
+		allOrderedDeps[1] = std::max(a->id, b->id);
+	}
+	else if (a->type == independent_old && (b->type == function_old || b->type == special_old)){
+		bool in = false;
+		for (int i = 0; i++; i<r_l){
+			if (r_ordered[i]==a->id){
+				in = true;
+			}
+		}
+		if(in){
+			allOrderedDeps = r_ordered;
+			countOrderedDeps = r_l;
+		}
+		else{
+			countOrderedDeps = r_l + 1;
+			allOrderedDeps = new unsigned short [countOrderedDeps];
+			int ri = 0;
+			bool done=  false;
+			for (int i = 0; i++; i<countOrderedDeps){
+				if (r_ordered[ri]<a->id || done){
+					allOrderedDeps[i] = r_ordered[ri];
+					ri++;
+				}
+				else{
+					allOrderedDeps[i] = a->id;
+					done = true;
+				}
+			}
+		}
+	}
+	else if ((a->type == function_old || a->type == special_old) && b->type == independent_old){
+		bool in = false;
+		for (int i = 0; i++; i<l_l){
+			if (l_ordered[i]==b->id){
+				in = true;
+			}
+		}
+		if(in){
+			allOrderedDeps = l_ordered;
+			countOrderedDeps = l_l;
+		}
+		else{
+			countOrderedDeps = l_l + 1;
+			allOrderedDeps = new unsigned short [countOrderedDeps];
+			int li = 0;
+			bool done=  false;
+			for (int i = 0; i++; i<countOrderedDeps){
+				if (l_ordered[li]<b->id || done){
+					allOrderedDeps[i] = l_ordered[li];
+					li++;
+				}
+				else{
+					allOrderedDeps[i] = b->id;
+					done = true;
+				}
+			}
+		}
+	}
+	else if ((a->type == function_old || a->type == special_old) && (b->type == function_old || b->type == special_old) ){
+		int uniques = r_l + l_l;
+			for (int i = 0; i< r_l; i++){
+				for (int ii = 0; ii< l_l; ii++){
+					if (r_ordered[i] == l_ordered[ii])
+						uniques--;
+				}
+			}
+			countOrderedDeps = uniques;
+			allOrderedDeps = new unsigned short[uniques];
+			int ri = 0;
+			int li = 0;
+			for (int i = 0; i<uniques; i++){
+				if (ri < r_l and li < l_l){
+					if (r_ordered[ri]<l_ordered[li]){
+						allOrderedDeps[i] = r_ordered[ri];
+						ri++;
+					}
+					else if (r_ordered[ri]>l_ordered[li]){
+						allOrderedDeps[i] = l_ordered[li];
+						li++;
+					}
+					else{
+						allOrderedDeps[i] = r_ordered[ri];
+						ri++;
+						li++;
+					}
+				}
+				else if (ri < r_l and li >= l_l){
+					allOrderedDeps[i] = r_ordered[ri];
+					ri++;
+				}
+				else if (ri >= r_l and li < l_l){
+					allOrderedDeps[i] = l_ordered[li];
+					li++;
+				}
+			
+			}
+	}
+
+
 	if (getDerivs){
 		std::string* add = new std::string;
 		*add = "+";
@@ -124,12 +212,13 @@ std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bo
 		if (op == "+"){
 			directDerivs[0]= one;
 			directDerivs[1]= one;
+			cPrint("here");
 		}
-		if (op == "-"){
+		else if (op == "-"){
 			directDerivs[0]= one;
 			directDerivs[1]= mone;
 		}
-		if (op == "/"){ //  f(x)/g(x)
+		else if (op == "/"){ //  f(x)/g(x)
 			Variable_old* flob = new Variable_old;
 			flob->f(one,b, di, false);	// 1/g(x)
 			directDerivs[0]= flob;
@@ -141,21 +230,46 @@ std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bo
 			tlob->f(fglob,klob, di, false); //-f(x)/g(x)**2
 			directDerivs[1]= tlob;
 		}
-		for (int gg=0; gg < n; gg++){
-			//cPrint("find deriv of id"+std::to_string(allOrderedDeps[gg]));
-			//cPrint("right has deps: " + std::to_string(right->countOrderedDeps));
-			//cPrint("right has a dep: " + std::to_string(right->allOrderedDeps[0]));
-			bool inleft = std::find(std::begin(left->allOrderedDeps), std::end(left->allOrderedDeps), allOrderedDeps[gg]) != std::end(left->allOrderedDeps);
-			bool inright = std::find(std::begin(right->allOrderedDeps), std::end(right->allOrderedDeps), allOrderedDeps[gg]) != std::end(right->allOrderedDeps);
-			cPrint("bef");
+		if (op == "+"){
+				cPrint("here2    " + std::to_string(countOrderedDeps));
+			}
+		for (int gg=0; gg < countOrderedDeps; gg++){
+			//bool inleft = std::find(std::begin(left->allOrderedDeps), std::end(left->allOrderedDeps), allOrderedDeps[gg]) != std::end(left->allOrderedDeps);
+			//bool inright = std::find(std::begin(right->allOrderedDeps), std::end(right->allOrderedDeps), allOrderedDeps[gg]) != std::end(right->allOrderedDeps);
+			bool inleft = false;
+			bool inright = false;
+			if (op == "+"){
+				cPrint("here");
+			}
+
+			if (l_l>0){
+			for (int i = 0; i<l_l; i++){
+				if (allOrderedDeps[gg] == l_ordered[i]){
+					inleft = true;
+					break;
+				}
+			}
+			}
+			if (r_l>0){
+			for (int i = 0; i<r_l; i++){
+				if (allOrderedDeps[gg] == r_ordered[i]){
+					inright = true;
+					break;
+				}
+			}
+			}
+			if (op == "+"){
+				cPrint("here");
+			}
+			// cPrint("bef");
 			cPrint(inleft ? "inleft: true":"inleft: false");
 			cPrint(inright ? "inright: true":"inright: false");
-			if (left->id == allOrderedDeps[gg] || left->countOrderedDeps == 1)inleft = true;
-			else if (left->type ==independent_old || left->type ==constant_old) inleft = false;
-			if (right->id == allOrderedDeps[gg] || right->countOrderedDeps == 1)inright = true;
-			else if (right->type ==independent_old || right->type ==constant_old) inright = false;
-			cPrint(inleft ? "inleft: true":"inleft: false");
-			cPrint(inright ? "inright: true":"inright: false");
+			// if (left->id == allOrderedDeps[gg] || left->countOrderedDeps == 1)inleft = true;
+			// else if (left->type ==independent_old || left->type ==constant_old) inleft = false;
+			// if (right->id == allOrderedDeps[gg] || right->countOrderedDeps == 1)inright = true;
+			// else if (right->type ==independent_old || right->type ==constant_old) inright = false;
+			// cPrint(inleft ? "inleft: true":"inleft: false");
+			// cPrint(inright ? "inright: true":"inright: false");
 			Variable_old* wip = new Variable_old;
 			if (right->id == allOrderedDeps[gg] && left->id == allOrderedDeps[gg] ){  //a a 
 				derivs[gg] = directDerivs[0]; //which equalts directDerivs[1]
@@ -215,6 +329,7 @@ std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bo
 				derivs[gg] = wip3;
 			}	
 			else if (inleft && !inright){   //f(a) b
+				cPrint("here i guess");
 				int c = 0;
 				while (c<left->countOrderedDeps){
 					if (left->allOrderedDeps[c] == allOrderedDeps[gg]){
@@ -222,7 +337,7 @@ std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bo
 					}
 					c++;
 				}
-				wip->f(directDerivs[0], left->derivs[c], mult, false);
+				wip->f(directDerivs[0], left->derivs[0], mult, false);
 				derivs[gg] = wip;
 			}	
 			else if (!inleft && inright){   //b f(a)
@@ -231,7 +346,7 @@ std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bo
 					if (right->allOrderedDeps[c] == allOrderedDeps[gg]){
 
 					cPrint("it's " + std::to_string(c));
-						break;
+					break;
 					}
 					c++;
 				}
@@ -259,24 +374,15 @@ std::string Variable_old::f(Variable_old *a, Variable_old *b, std::string *o, bo
 			}	
 			//else cPrint("probably error :D");
 			
-		}
-		
+		}	
 	}
-	if (getDerivs){
-		float * h = new float[1];
-		h[0] = 0;
-		return "value at 0 of the 0th direct deriv is " + std::to_string(directDerivs[0]->getValue(h)) +"value at 0 of the 1st direct deriv is " + std::to_string(directDerivs[1]->getValue(h)) + "value at 0 of the deriv is " + std::to_string(derivs[0]->getValue(h)) + "the 0th deriv of this is" + derivs[0]->preview();
 	
-	}
-	return "This function_old has " + std::to_string(countOrderedDeps) + " dependencies";
-
 }
-std::string Variable_old::f(Variable_old *a, std::string* o, bool getDerivs)
+void Variable_old::f(Variable_old *a, std::string* o, bool getDerivs)
 {
 	type = special_old;
 	left = a;
 	std::string gop = static_cast<std::string>(*o);
-	tree[0] = left->build();
 	op = gop;
 	std::string* e = new std::string;
 	*e = "exp";
@@ -290,9 +396,8 @@ std::string Variable_old::f(Variable_old *a, std::string* o, bool getDerivs)
 	{
 		if (left->type ==function_old){
 			countOrderedDeps = left->countOrderedDeps;
-			for (int g = 0; g < countOrderedDeps; g++){
-				allOrderedDeps[g] = left->allOrderedDeps[g];
-				}
+			allOrderedDeps = left->allOrderedDeps;
+			cPrint("hereexp     " + std::to_string(countOrderedDeps));
 			if (getDerivs){
 				Variable_old* wip2 = new Variable_old;
 				wip2->f(left, e, false);
@@ -307,6 +412,7 @@ std::string Variable_old::f(Variable_old *a, std::string* o, bool getDerivs)
 		}
 		if (left->type == independent_old){
 			countOrderedDeps = 1;
+			allOrderedDeps = new unsigned short[1];
 			allOrderedDeps[0] = left->id;
 			if (getDerivs){
 				Variable_old* wip2 = new Variable_old;
@@ -320,9 +426,7 @@ std::string Variable_old::f(Variable_old *a, std::string* o, bool getDerivs)
 	{
 		if (left->type ==function_old){
 			countOrderedDeps = left->countOrderedDeps;
-			for (int g = 0; g < countOrderedDeps; g++){
-				allOrderedDeps[g] = left->allOrderedDeps[g];
-			}
+			allOrderedDeps = left->allOrderedDeps;
 			if (getDerivs){
 				Variable_old* wip2 = new Variable_old;
 				Variable_old* wip3 = new Variable_old;
@@ -343,7 +447,7 @@ std::string Variable_old::f(Variable_old *a, std::string* o, bool getDerivs)
 		}
 		if (left->type == independent_old){
 			countOrderedDeps = 1;
-			allOrderedDeps[0] = left->id;
+			allOrderedDeps = new unsigned short[1];
 			if (getDerivs){
 				Variable_old* wip2 = new Variable_old;
 				Variable_old* wip3 = new Variable_old;
@@ -361,17 +465,13 @@ std::string Variable_old::f(Variable_old *a, std::string* o, bool getDerivs)
 	if (getDerivs){
 		float * h = new float[1];
 		h[0] = 0;
-		return "value at 0 of the deriv is " + std::to_string(derivs[0]->getValue(h)) + "the 0th deriv of this is" + derivs[0]->preview();
-	
+		
 	}
-	return "hope" ;
-
 }
-std::string Variable_old::f(Variable_old *a, std::string *o, int p, bool getDerivs){
+void Variable_old::f(Variable_old *a, std::string *o, int p, bool getDerivs){
 	type = special_old;
 	left = a;
 	std::string gop = static_cast<std::string>(*o);
-	tree[0] = left->build();
 	op = gop;
 	pw = p;
 	std::string* pwt = new std::string;
@@ -427,28 +527,9 @@ std::string Variable_old::f(Variable_old *a, std::string *o, int p, bool getDeri
 	if (getDerivs){
 		float * h = new float[1];
 		h[0] = 0;
-		return "value at 0 of the deriv is " + std::to_string(derivs[0]->getValue(h)) + "the 0th deriv of this is" + derivs[0]->preview();
 	}
-	return "hope" ;
-}
-void Variable_old::m(Variable_old *a)
-{
-	type = matrix_old;
-	left = a;
-	tree[0] = left->build();
 }
 
-Variable_old::~Variable_old()
-{
-}
-float Variable_old::getValue(float **v, int rows){
-	float* vals = left->feed(v, rows);
-	float out=0;
-	for (int i = 0; i<rows;i++){
-		out += vals[i];
-	}
-	return out/rows;
-}
 float Variable_old::getValue(float *v)
 {
    	if (type == constant_old)return value;
@@ -471,23 +552,32 @@ float Variable_old::getValue(float *v)
 		float lv = left->getValue(v);
 		return lv*lv;
 	}
-	float lout [deps[0]];
-	float rout [deps[1]];
-	for (unsigned short i = 0; i<countOrderedDeps; i++){
-		//int x = std::distance(depsList[0], std::find(depsList[0], depsList[0] + deps[0], allOrderedDeps[i]));
-		for (unsigned short hh = 0; hh<deps[0];hh++){
-			if (depsList[0][hh] == allOrderedDeps[i]){
-				lout[hh] = v[i];
+	float lv;
+	if (l_l > 0){
+		float lout [l_l];
+		for (unsigned short i = 0; i<countOrderedDeps; i++){
+			for (unsigned short hh = 0; hh<l_l;hh++){
+				if (l_ordered[hh] == allOrderedDeps[i]){
+					lout[hh] = v[i];
+				}
 			}
 		}
-		for (unsigned short hh = 0; hh<deps[1];hh++){
-			if (depsList[1][hh] == allOrderedDeps[i]){
-				rout[hh] = v[i];
-			}
-		}
+		lv = left->getValue(lout);
 	}
-	float lv = left->getValue(lout);
-	float rv = right->getValue(rout);
+	else lv = left->getValue(v);
+	float rv;
+	if (r_l > 0){
+		float rout [r_l];
+		for (unsigned short i = 0; i<countOrderedDeps; i++){
+			for (unsigned short hh = 0; hh<r_l;hh++){
+				if (r_ordered[hh] == allOrderedDeps[i]){
+					rout[hh] = v[i];
+				}
+			}
+		}
+		rv = right->getValue(rout);
+	}
+	else rv = right->getValue(v);
 	cPrint("left value: "  + std::to_string(lv));
 	cPrint("right value: " +std::to_string(rv));
 	if (op == "+")return  lv + rv;
@@ -496,31 +586,7 @@ float Variable_old::getValue(float *v)
 	if (op == "/")return  lv / rv;
 	return -42;
 }
-float* Variable_old::feed(float **v, int rows){
-	float out[rows]; 
-	for (int i = 0; i< rows;i++){
-		out[i] = getValue(v[i]);
-	}
-	fValues = out;
-	return fValues;
-}
-float Variable_old::getDerivValue(int g,float *v){
-	float* pass = new float[derivs[g]->countOrderedDeps];
-	int help = 0;
 
-	// for (int i=0; i<countOrderedDeps; i++){
-	// 	bool inDeriv;
-	// 	if (derivs[g]->type == function_old || derivs[g]->type == special_old)
-	// 	inDeriv = std::find(std::begin(derivs[g]->allOrderedDeps), std::end(derivs[g]->allOrderedDeps), allOrderedDeps[i]) != std::end(derivs[g]->allOrderedDeps);
-	// 	else if (derivs[g]->type == independent_old && derivs[g]->id == allOrderedDeps[i])
-	// 	inDeriv = true;
-	// 	else
-	// 	inDeriv = false;
-	// 	if (inDeriv){
-	// 		pass[help] = v[i];
-	// 		help++;
-	// 	}
-	// }
+float Variable_old::getDerivValue(int g,float *v){
 	return derivs[g]->getValue(v);
-	//return directDerivs[1]->getValue(v) * right->derivs[0]->getValue(v);
-}
+	}
